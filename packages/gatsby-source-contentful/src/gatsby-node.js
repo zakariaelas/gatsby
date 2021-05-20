@@ -148,6 +148,40 @@ const localeState = new CascadedContext()
 
 exports.createSchemaCustomization = ({ actions }) => {
   actions.createResolverContext({ localeState })
+  actions.createFieldExtension({
+    name: `contentfulLocalized`,
+    args: {
+      contentfulFieldId: {
+        type: `String!`,
+      },
+    },
+    extend(options) {
+      return {
+        args: {
+          locale: `String`,
+        },
+        resolve(source, args, context, info) {
+          console.log(
+            JSON.stringify(
+              { source, args, context: context.sourceContentful },
+              null,
+              2
+            )
+          )
+
+          let locale
+          if (args.locale) {
+            context.sourceContentful.localeState.set(info, args.locale)
+            locale = args.locale
+          } else {
+            locale = context.sourceContentful.localeState.get(info) || `en-US` // @todo we need default locale
+          }
+          const fieldValue = source.localeTest[options.contentfulFieldId] || {}
+          return fieldValue[locale] || null
+        },
+      }
+    },
+  })
 }
 
 exports.createResolvers = ({ createResolvers }) => {

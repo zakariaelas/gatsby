@@ -7,7 +7,6 @@ export function generateSchema({
   schema,
   pluginConfig,
   contentTypeItems,
-  defaultLocale,
 }) {
   const getLinkFieldType = (linkType, field) => {
     return {
@@ -47,8 +46,15 @@ export function generateSchema({
   const ContentfulDataTypes = new Map([
     [
       `Symbol`,
-      () => {
-        return { type: `String` }
+      field => {
+        return {
+          type: `String`,
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
+          },
+        }
       },
     ],
     [
@@ -67,49 +73,39 @@ export function generateSchema({
     ],
     [
       `Integer`,
-      () => {
+      field => {
         return {
           type: `Int`,
-          resolve(source, args, context, info) {
-            let locale
-            if (args.locale) {
-              context.sourceContentful.localeState.set(info, args.locale)
-              locale = args.locale
-            } else {
-              locale =
-                context.sourceContentful.localeState.get(info) || defaultLocale
-            }
-
-            console.log(
-              JSON.stringify(
-                {
-                  source,
-                  args,
-                  context: context.sourceContentful,
-                  info,
-                  locale,
-                },
-                null,
-                2
-              )
-            )
-            return source[info.fieldName]
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
           },
         }
       },
     ],
     [
       `Number`,
-      () => {
-        return { type: `Float` }
+      field => {
+        return {
+          type: `Float`,
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
+          },
+        }
       },
     ],
     [
       `Date`,
-      () => {
+      field => {
         return {
           type: `Date`,
           extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
             dateformat: {},
           },
         }
@@ -117,26 +113,54 @@ export function generateSchema({
     ],
     [
       `Object`,
-      () => {
-        return { type: `JSON` }
+      field => {
+        return {
+          type: `JSON`,
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
+          },
+        }
       },
     ],
     [
       `Boolean`,
-      () => {
-        return { type: `Boolean` }
+      field => {
+        return {
+          type: `Boolean`,
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
+          },
+        }
       },
     ],
     [
       `Location`,
-      () => {
-        return { type: `ContentfulNodeTypeLocation` }
+      field => {
+        return {
+          type: `ContentfulNodeTypeLocation`,
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
+          },
+        }
       },
     ],
     [
       `RichText`,
-      () => {
-        return { type: `ContentfulNodeTypeRichText` }
+      field => {
+        return {
+          type: `ContentfulNodeTypeRichText`,
+          extensions: {
+            contentfulLocalized: {
+              contentfulFieldId: field.id,
+            },
+          },
+        }
       },
     ],
   ])
