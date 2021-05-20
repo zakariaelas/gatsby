@@ -115,6 +115,11 @@ export const pageQuery = graphql`
           }
           ... on ContentfulContentReference {
             title
+            ... on ContentfulEntry {
+              sys {
+                id
+              }
+            }
             one {
               ... on ContentfulText {
                 title
