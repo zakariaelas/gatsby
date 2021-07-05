@@ -27,8 +27,7 @@ All queries have `limit=100` (although some of them may return just several item
   - `in`: captures 1/2 of all nodes
   - `gt`: the first query captures all nodes, the last one - 0 nodes
   - `lt`: the first query captures 0 nodes, the last - all nodes
-  - `gt-lt`: any query captures 1000 items; last 1000 pages may capture 999 to 0 if the number of
-    pages is the same as the number of nodes (`gt: currentPage, lt: currentPage + 1000`)
+  - `gt-lt`: any query captures 1000 items; last 1000 pages will capture from 999 to 0 (`gt: currentPage, lt: currentPage + 1000`)
   - `nin`: captures 1/2 of all nodes
   - `ne`: captures 3/4 of all nodes
   - `regex`: captures from 1/4 to 1/3 of all nodes (simple and fast regexp)

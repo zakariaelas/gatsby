@@ -25,6 +25,7 @@ exports.createSchemaCustomization = ({ actions }) => {
       fooBarArray: [TestFooBarArray!]
       text: String!
       random: Float
+      randomPage: Float
     }
     type TestFooBarArray {
       fooBar: String!
@@ -53,6 +54,7 @@ exports.sourceNodes = async ({ actions: { createNode } }) => {
       ],
       text: TEXT ? randomStr(4128) : `${nodeNum}`,
       random: Math.random() * NUM_NODES,
+      randomPage: Math.random() * NUM_PAGES,
       internal: {
         type: `Test`,
         contentDigest: String(nodeNum),
@@ -88,7 +90,6 @@ exports.createPages = async ({ actions: { createPage } }) => {
         pageNum: pageNum,
         pageNumPlus1000: pageNum + 1000,
         pageNumStr: String(pageNum),
-        pagesLeft: NUM_PAGES - pageNum,
         limit: nodesPerPage,
         skip: nodesPerPage * pageNum,
         nodesTotal: NUM_NODES,

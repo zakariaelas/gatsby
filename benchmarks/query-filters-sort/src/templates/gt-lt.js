@@ -16,7 +16,7 @@ export const query = graphql`
     $count: Boolean!
   ) {
     allTest(
-      filter: { nodeNum: { gt: $pageNum, lt: $pageNumPlus1000 } }
+      filter: { randomPage: { gt: $pageNum, lt: $pageNumPlus1000 } }
       sort: $sort
       limit: 100
     ) {
