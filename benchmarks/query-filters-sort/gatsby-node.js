@@ -21,7 +21,7 @@ exports.createSchemaCustomization = ({ actions }) => {
       pageNum: Int!
       pageNumStr: String!
       fooBar: String!
-      fooBarBaz: String!
+      fooBar2: String!
       fooBarArray: [TestFooBarArray!]
       text: String!
       random: Float
@@ -46,7 +46,7 @@ exports.sourceNodes = async ({ actions: { createNode } }) => {
       pageNum,
       pageNumStr: String(pageNum),
       fooBar: [`foo`, `bar`, `baz`, `foobar`][nodeNum % 4],
-      fooBarBaz: [`foo`, `bar`, `baz`][pageNum % 3],
+      fooBar2: [`foo`, `bar`, `baz`, `foobar`][pageNum % 4],
       fooBarArray: [
         { fooBar: [`foo`, `bar`, `baz`, `foobar`][nodeNum % 4] },
         { fooBar: [`bar`, `baz`, `foobar`, `foo`][nodeNum % 4] },
@@ -85,7 +85,6 @@ exports.createPages = async ({ actions: { createPage } }) => {
           [`foo`, `bar`, `baz`, `foobar`][(pageNum + 1) % 4],
         ],
         fooBar: [`foo`, `bar`, `baz`, `foobar`][pageNum % 4],
-        fooBarBaz: [`foo`, `bar`, `baz`][pageNum % 3],
         pageNum: pageNum,
         pageNumPlus1000: pageNum + 1000,
         pageNumStr: String(pageNum),
