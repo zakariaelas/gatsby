@@ -170,10 +170,9 @@ function* performRangeScan(
       limit = offset + limit
       offset = 0
     }
-    if (stats.maxKeysPerItem > 1) {
+    if (isMultiKeyIndex(context) && needsDeduplication(context)) {
       // Cannot use limit:
       // MultiKey index may contain duplicates - we can only set a safe upper bound
-      // TODO: we probably can use proper limit if all indexMetadata.multiKeyFields have `eq` filters in usedQueries
       limit *= stats.maxKeysPerItem
     }
   }
