@@ -138,6 +138,29 @@ module.exports = async (program: IServeProgram): Promise<void> => {
   }
 
   if (functions) {
+    const ssrRoutes = new Map()
+    functions.forEach(fn => {
+      if (
+        fn.functionRoute.startsWith(`_ssr/`) &&
+        !fn.functionRoute.startsWith(`_ssr/page-data/`)
+      ) {
+        const pathName = fn.functionRoute.replace(`_ssr`, ``)
+        ssrRoutes.set(pathName, `/api/${fn.functionRoute}`)
+        ssrRoutes.set(
+          `/page-data${pathName}/page-data.json`,
+          `/api/${fn.functionRoute.replace(`_ssr`, `_ssr/page-data`)}`
+        )
+      }
+    })
+
+    app.use(`/`, (req, _, next) => {
+      if (ssrRoutes.has(req.path)) {
+        req.url = ssrRoutes.get(req.path)
+      }
+
+      next()
+    })
+
     app.use(
       `/api/*`,
       multer().any(),
@@ -158,6 +181,7 @@ module.exports = async (program: IServeProgram): Promise<void> => {
       express.raw(),
       async (req, res, next) => {
         const { "0": pathFragment } = req.params
+        console.log(`new path`)
 
         // Check first for exact matches.
         let functionObj = functions.find(

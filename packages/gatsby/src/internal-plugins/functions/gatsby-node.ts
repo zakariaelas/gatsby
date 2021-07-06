@@ -152,6 +152,11 @@ const createWebpackConfig = async ({
   } catch (err) {
     // don't care
   }
+  try {
+    fs.mkdirpSync(path.join(ssrFunctionsDir, `page-data`))
+  } catch (err) {
+    // don't care
+  }
 
   const globs = createGlobArray(
     siteDirectoryPath,
@@ -205,6 +210,7 @@ const createWebpackConfig = async ({
     const pageGenerator = require('../ssr-static-entry').default;
     const PageModule = require("${page.component}");
     const Page = PageModule.default ? PageModule.default : PageModule;
+    const webpackStats = require("../../public/webpack.stats.json");
 
     module.exports = async function SSRPage(req, res) {
       console.log('SSRing ${pathName}!')
@@ -220,15 +226,27 @@ const createWebpackConfig = async ({
         }
       }
 
+      const scriptsAndStyles = await getScriptsAndStylesForTemplate(
+        "${page.componentChunkName}"
+      )
+      console.log({scriptsAndStyles})
+
       try {
         const pageGenResult = pageGenerator({
           pagePath: '${pathName}',
-          pageData: props,
+          pageData: {
+            "componentChunkName": "${page.componentChunkName}",
+            "path": "${pathName}",
+            "result": {
+              "pageContext": props,
+            },
+            "staticQueryHashes": []
+          },
           staticQueryContext: [],
-          styles: [],
-          scripts: [],
-          reversedStyles: [],
-          reversedScripts: [],
+          styles: scriptsAndStyles.styles,
+          scripts: scriptsAndStyles.scripts,
+          reversedStyles: scriptsAndStyles.reversedStyles,
+          reversedScripts: scriptsAndStyles.reversedScripts,
           innerComponent: Page,
         })
         return res.status(200).send(pageGenResult.html)
@@ -236,6 +254,154 @@ const createWebpackConfig = async ({
         console.error(e)
         return res.status(500).send('Server Error')
       }
+    }
+
+    async function getScriptsAndStylesForTemplate(
+      componentChunkName
+    ) {
+      const uniqScripts = new Map()
+      const uniqStyles = new Map()
+
+      /**
+       * Add script or style to correct bucket. Make sure those are unique (no duplicates) and that "preload" will win over any other "rel"
+       */
+      function handleAsset(name, rel) {
+        let uniqueAssetsMap
+
+        // pick correct map depending on asset type
+        if (name.endsWith(".js")) {
+          uniqueAssetsMap = uniqScripts
+        } else if (name.endsWith(".css")) {
+          uniqueAssetsMap = uniqStyles
+        }
+
+        if (uniqueAssetsMap) {
+          const existingAsset = uniqueAssetsMap.get(name)
+
+          if (
+            existingAsset &&
+            rel === "preload" &&
+            existingAsset.rel !== "preload"
+          ) {
+            // if we already track this asset, but it's not preload - make sure we make it preload
+            // as it has higher priority
+            existingAsset.rel = "preload"
+          } else if (!existingAsset) {
+            uniqueAssetsMap.set(name, { name, rel })
+          }
+        }
+      }
+
+      // Pick up scripts and styles that are used by a template using webpack.stats.json
+      for (const chunkName of ["app", componentChunkName]) {
+        const assets = webpackStats.assetsByChunkName[chunkName]
+        if (!assets) {
+          continue
+        }
+
+        for (const asset of assets) {
+          if (asset === "/") {
+            continue
+          }
+
+          handleAsset(asset, "preload")
+        }
+
+        // Handling for webpack magic comments, for example:
+        // import(/* webpackChunkName: "<chunk_name>", webpackPrefetch: true */ "<path_to_module>")
+        // Shape of webpackStats.childAssetsByChunkName:
+        // {
+        //   childAssetsByChunkName: {
+        //     <name_of_top_level_chunk>: {
+        //       prefetch: [
+        //         "<chunk_name>-<chunk_hash>.js",
+        //       ]
+        //     }
+        //   }
+        // }
+        const childAssets = webpackStats.childAssetsByChunkName[chunkName]
+        if (!childAssets) {
+          continue
+        }
+
+        for (const [rel, assets] of Object.entries(childAssets)) {
+          // @ts-ignore TS doesn't like that assets is not typed and especially that it doesn't know that it's Iterable
+          for (const asset of assets) {
+            handleAsset(asset, rel)
+          }
+        }
+      }
+
+      // create scripts array, making sure "preload" scripts have priority
+      const scripts = []
+      for (const scriptAsset of uniqScripts.values()) {
+        if (scriptAsset.rel === "preload") {
+          // give priority to preload
+          scripts.unshift(scriptAsset)
+        } else {
+          scripts.push(scriptAsset)
+        }
+      }
+
+      // create styles array, making sure "preload" styles have priority and that we read .css content for non-prefetch "rel"s for inlining
+      const styles = []
+      for (const styleAsset of uniqStyles.values()) {
+        if (styleAsset.rel !== "prefetch") {
+          let getInlineCssPromise = inlineCssPromiseCache.get(styleAsset.name)
+          if (!getInlineCssPromise) {
+            getInlineCssPromise = fs.readFile(
+              join(process.cwd(), "public", styleAsset.name),
+              "utf-8"
+            )
+
+            inlineCssPromiseCache.set(styleAsset.name, getInlineCssPromise)
+          }
+
+          styleAsset.content = await getInlineCssPromise
+        }
+
+        if (styleAsset.rel === "preload") {
+          // give priority to preload
+          styles.unshift(styleAsset)
+        } else {
+          styles.push(styleAsset)
+        }
+      }
+
+      return {
+        scripts,
+        styles,
+        reversedStyles: styles.slice(0).reverse(),
+        reversedScripts: scripts.slice(0).reverse(),
+      }
+    }
+  `
+  const SSR_PAGE_DATA_FUNCTION_TEMPLATE = ({ page, pathName }): string => `
+    const PageModule = require("${page.component}");
+    const Page = PageModule.default ? PageModule.default : PageModule;
+
+    module.exports = async function SSRPage(req, res) {
+      console.log('SSRing pagedata ${pathName}!')
+      let props = {}
+      if (Page && Page.getServerData) {
+        console.log('Page has getServerData Function')
+        const propsPromise = Promise.resolve(Page.getServerData(req))
+        try {
+          props = await propsPromise
+          console.log('Props from getServerData Function', props)
+        } catch (e) {
+          console.error(e)
+        }
+      }
+
+      res.json({
+        "componentChunkName": "${page.componentChunkName}",
+        "path": "${pathName}",
+        "result": {
+          "pageContext": props,
+        },
+        "staticQueryHashes": []
+      })
     }
   `
 
@@ -259,10 +425,41 @@ const createWebpackConfig = async ({
         ),
         matchPath: getMatchPath(`_ssr/${pathName}`),
       })
+      knownFunctions.push({
+        functionRoute: `_ssr/page-data${pathName}`,
+        pluginName: `default-site-plugin`,
+        originalAbsoluteFilePath: path.join(
+          ssrFunctionsDir,
+          `page-data`,
+          compiledFunctionName
+        ),
+        originalRelativeFilePath: path.join(
+          `_ssr`,
+          `page-data`,
+          compiledFunctionName
+        ),
+        relativeCompiledFilePath: path.join(
+          `_ssr`,
+          `page-data`,
+          compiledFunctionName
+        ),
+        absoluteCompiledFilePath: path.join(
+          compiledFunctionsDir,
+          `_ssr`,
+          `page-data`,
+          compiledFunctionName
+        ),
+        matchPath: getMatchPath(`_ssr/page-data/${pathName}`),
+      })
 
       fs.writeFileSync(
         path.join(ssrFunctionsDir, pathName + `.js`),
         SSR_FUNCTION_TEMPLATE({ page, pathName })
+      )
+
+      fs.writeFileSync(
+        path.join(ssrFunctionsDir, `page-data`, pathName + `.js`),
+        SSR_PAGE_DATA_FUNCTION_TEMPLATE({ page, pathName })
       )
     }
   }
