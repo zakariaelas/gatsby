@@ -6,11 +6,9 @@ const { merge, flattenDeep, replace } = require(`lodash`)
 const fs = require(`fs`)
 
 const { RouteAnnouncerProps } = require(`./route-announcer-props`)
-const apiRunner = require(`./api-runner-ssr`)
+const { apiRunner } = require(`./api-runner-ssr`)
 const { version: gatsbyVersion } = require(`gatsby/package.json`)
 const { grabMatchParams } = require(`./find-path`)
-
-const chunkMapping = require(`../public/chunk-map.json`)
 
 // @TODO: Added for work arounds
 const StaticQueryContext = React.createContext({})
@@ -97,6 +95,14 @@ export default ({
   reversedScripts,
   innerComponent,
 }) => {
+  // this doesn't exist on the first run, javascript hasn't ran yet so it doesn't exist yet
+  // need to move this function creation to later in the stage
+  let chunkMapping
+  try {
+    chunkMapping = require(`../public/chunk-map.json`)
+  } catch (err) {
+    chunkMapping = {}
+  }
   // for this to work we need this function to be sync or at least ensure there is single execution of it at a time
   global.unsafeBuiltinUsage = []
 
@@ -432,8 +438,6 @@ export default ({
         path={pagePath}
       />
     )}`
-
-    console.log({ html, unsafeBuiltinsUsage: global.unsafeBuiltinUsage })
 
     return { html, unsafeBuiltinsUsage: global.unsafeBuiltinUsage }
   } catch (e) {

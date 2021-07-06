@@ -200,11 +200,13 @@ const createWebpackConfig = async ({
   const knownFunctions = _.unionBy(...allFunctions, func => func.functionRoute)
 
   const SSR_FUNCTION_TEMPLATE = ({ page, pathName }): string => `
-    import * as React from 'react';
-    import { renderToString } from 'react-dom/server';
-    import pageGenerator from '../ssr-static-entry';
-    const Page = require("${page.component}");
-    export default async function SSRPage(req, res) {
+    const React = require('react');
+    const { renderToString } = require('react-dom/server');
+    const pageGenerator = require('../ssr-static-entry').default;
+    const PageModule = require("${page.component}");
+    const Page = PageModule.default ? PageModule.default : PageModule;
+
+    module.exports = async function SSRPage(req, res) {
       console.log('SSRing ${pathName}!')
       let props = {}
       if (Page && Page.getServerData) {
@@ -217,7 +219,7 @@ const createWebpackConfig = async ({
           console.error(e)
         }
       }
-      
+
       try {
         const pageGenResult = pageGenerator({
           pagePath: '${pathName}',
@@ -227,15 +229,13 @@ const createWebpackConfig = async ({
           scripts: [],
           reversedStyles: [],
           reversedScripts: [],
-          innerComponent: Page.default,
+          innerComponent: Page,
         })
-        console.log(pageGenResult)
+        return res.status(200).send(pageGenResult.html)
       } catch (e) {
         console.error(e)
+        return res.status(500).send('Server Error')
       }
-
-      console.log('Returning component string')
-      return res.send(renderToString(React.createElement(Page.default, props)))
     }
   `
 
@@ -350,7 +350,10 @@ const createWebpackConfig = async ({
       filename: `[name].js`,
       libraryTarget: `commonjs2`,
     },
-    target: `node`,
+    target: `node12.13`,
+    externalsPresets: {
+      node: true,
+    },
 
     // Minification is expensive and not as helpful for serverless functions.
     optimization: {
@@ -379,8 +382,31 @@ const createWebpackConfig = async ({
     module: {
       rules: [
         {
-          test: [/.js$/, /.ts$/],
-          exclude: /node_modules/,
+          test: /\.mjs$/i,
+          resolve: {
+            byDependency: {
+              esm: {
+                fullySpecified: false,
+              },
+            },
+          },
+        },
+        {
+          test: /\.js$/i,
+          descriptionData: {
+            type: `module`,
+          },
+          resolve: {
+            byDependency: {
+              esm: {
+                fullySpecified: false,
+              },
+            },
+          },
+        },
+        {
+          test: [/.jsx?$/, /.tsx?$/],
+          // exclude: /node_modules/,
           use: {
             loader: `babel-loader`,
             options: {
@@ -389,7 +415,7 @@ const createWebpackConfig = async ({
                 [
                   `babel-preset-gatsby`,
                   {
-                    stage: `build-javascript`,
+                    stage: `build-html`,
                     reactRuntime: `classic`,
                   },
                 ],
