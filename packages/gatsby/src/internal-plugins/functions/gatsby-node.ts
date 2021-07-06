@@ -210,16 +210,21 @@ const createWebpackConfig = async ({
     const pageGenerator = require('../ssr-static-entry').default;
     const PageModule = require("${page.component}");
     const Page = PageModule.default ? PageModule.default : PageModule;
-    const webpackStats = require("../../public/webpack.stats.json");
+    let webpackStats = {};
+
+    try {
+      webpackStats = require("../../public/webpack.stats.json");
+    } catch(err) {
+      // unused
+    }
 
     module.exports = async function SSRPage(req, res) {
       console.log('SSRing ${pathName}!')
       let props = {}
-      if (Page && Page.getServerData) {
+      if (PageModule && PageModule.getServerData) {
         console.log('Page has getServerData Function')
-        const propsPromise = Promise.resolve(Page.getServerData(req))
         try {
-          props = await propsPromise
+          props = await Promise.resolve(PageModule.getServerData(req))
           console.log('Props from getServerData Function', props)
         } catch (e) {
           console.error(e)
@@ -383,11 +388,10 @@ const createWebpackConfig = async ({
     module.exports = async function SSRPage(req, res) {
       console.log('SSRing pagedata ${pathName}!')
       let props = {}
-      if (Page && Page.getServerData) {
+      if (PageModule && PageModule.getServerData) {
         console.log('Page has getServerData Function')
-        const propsPromise = Promise.resolve(Page.getServerData(req))
         try {
-          props = await propsPromise
+          props = await Promise.resolve(PageModule.getServerData(req))
           console.log('Props from getServerData Function', props)
         } catch (e) {
           console.error(e)
@@ -578,29 +582,6 @@ const createWebpackConfig = async ({
     // watch: !isProductionEnv,
     module: {
       rules: [
-        {
-          test: /\.mjs$/i,
-          resolve: {
-            byDependency: {
-              esm: {
-                fullySpecified: false,
-              },
-            },
-          },
-        },
-        {
-          test: /\.js$/i,
-          descriptionData: {
-            type: `module`,
-          },
-          resolve: {
-            byDependency: {
-              esm: {
-                fullySpecified: false,
-              },
-            },
-          },
-        },
         {
           test: [/.jsx?$/, /.tsx?$/],
           // exclude: /node_modules/,
