@@ -303,7 +303,7 @@ function jsValueToLmdbKey(value: unknown): IndexFieldValue | undefined {
   }
   // FIXME: not sure if we want this but there are tests for this :/
   if (typeof value === `object`) {
-    // return JSON.stringify(value)
+    return JSON.stringify(value)
   }
   return undefined
 }
